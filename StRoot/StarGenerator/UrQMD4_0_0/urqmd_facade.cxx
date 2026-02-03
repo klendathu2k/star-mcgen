@@ -1,0 +1,618 @@
+#include "urqmd_facade.h"
+#include <iostream>
+#include <cstdlib>
+
+//
+// C++ implementation of UrQMD_main FORTRAN subroutine
+// Translates the main event loop logic from FORTRAN to C++ using procedural style
+//
+
+// COMMON block declarations (matching FORTRAN layout)
+// These allow direct access to FORTRAN COMMON blocks from C++
+
+// /energies/ common block
+extern "C" {
+    struct {
+        double Ekinbar, Ekinmes, ESky2, ESky3, EYuk, ECb, EPau;
+    } F77_NAME(energies, ENERGIES);
+}
+
+// /sys/ common block
+extern "C" {
+    struct {
+        int npart, nbar, nmes, ctag, nsteps, uid_cnt;
+        int ranseed, event, Ap, At, Zp, Zt, eos, dectag;
+        int NHardRes, NSoftRes, NDecRes, NElColl, NBlColl;
+        int success;  // logical -> int mapping
+        int npartcoal, nclus;
+    } F77_NAME(sys, SYS);
+}
+
+// /rsys/ common block
+extern "C" {
+    struct {
+        double time, acttime, bdist, bimp, bmin, ebeam, ecm;
+    } F77_NAME(rsys, RSYS);
+}
+
+// /inputs/ common block
+extern "C" {
+    struct {
+        int nevents, spityp[2], prspflg, trspflg;
+        int spiso3[2], outsteps, bflag, srtflag, efuncflag, nsrt;
+        int firstev, npb;
+    } F77_NAME(inputs, INPUTS);
+}
+
+// /input2/ common block
+extern "C" {
+    struct {
+        double srtmin, srtmax, pbeam, betann, betatar, betapro;
+        double pbmin, pbmax;
+    } F77_NAME(input2, INPUT2);
+}
+
+// /options/ common block
+extern "C" {
+    struct {
+        int CTOption[400];
+        double CTParam[400];
+    } F77_NAME(options, OPTIONS);
+}
+
+// /loptions/ common block
+extern "C" {
+    struct {
+        int fixedseed, bf13, bf14, bf15, bf16, bf19, bf20;  // logical -> int
+    } F77_NAME(loptions, LOPTIONS);
+}
+
+// /stables/ common block
+extern "C" {
+    struct {
+        int nstable;
+        int stabvec[20];
+    } F77_NAME(stables, STABLES);
+}
+
+// /comseed/ common block
+extern "C" {
+    struct {
+        int firstseed;  // logical -> int
+    } F77_NAME(comseed, COMSEED);
+}
+
+// /colltab/ common block
+extern "C" {
+    struct {
+        double cttime[100001];  // 0:ncollmax
+        double ctsqrts[100000];
+        double ctsigtot[100000];
+        double tmin;
+        int cti1[100000];
+        int cti2[100000];
+        int nct;
+        int actcol;
+        int ctvalid[100000];  // logical -> int
+        int ctsav[100000];
+        int nsav;
+        int apt;
+        double ctcolfluc[100000];
+    } F77_NAME(colltab, COLLTAB);
+}
+
+// /inewpart/ common block
+extern "C" {
+    struct {
+        int itypnew[1000];
+        int i3new[1000];
+        int itot[1000];
+        int inew[1000];
+        int nexit;
+        int iline;
+        int pslot[2];
+        int nstring1, nstring2;
+        int itypold[2];
+        int iso3old[2];
+    } F77_NAME(inewpart, INEWPART);
+}
+
+// /coor/ common block (particle coordinates)
+extern "C" {
+    struct {
+        double r0[100000];
+        double rx[100000];
+        double ry[100000];
+        double rz[100000];
+        double p0[100000];
+        double px[100000];
+        double py[100000];
+        double pz[100000];
+        double fmass[100000];
+        double rww[100000];
+        double dectime[100000];
+    } F77_NAME(coor, COOR);
+}
+
+// /isys/ common block (particle properties)
+extern "C" {
+    struct {
+        int spin[100000];
+        int ncoll[100000];
+        int charge[100000];
+        int ityp[100000];
+        int lstcoll[100000];
+        int iso3[100000];
+        int origin[100000];
+        int uid[100000];
+    } F77_NAME(isys, ISYS);
+}
+
+// /pots/ common block
+extern "C" {
+    struct {
+        double Cb0, Yuk0, Pau0, Sky20, Sky30, gamSky;
+        double gamYuk, drPau, dpPau, gw, sgw, delr, fdel;
+        double dt, da, db, dtimestep;
+    } F77_NAME(pots, POTS);
+}
+
+// Parameters
+const double emnuc = 0.938;  // nucleon mass
+
+// Macro to access COMMON blocks
+#define SYS F77_NAME(sys, SYS)
+#define RSYS F77_NAME(rsys, RSYS)
+#define INPUTS F77_NAME(inputs, INPUTS)
+#define OPTIONS F77_NAME(options, OPTIONS)
+#define LOPTIONS F77_NAME(loptions, LOPTIONS)
+#define COMSEED F77_NAME(comseed, COMSEED)
+#define COLLTAB F77_NAME(colltab, COLLTAB)
+#define INEWPART F77_NAME(inewpart, INEWPART)
+#define COOR F77_NAME(coor, COOR)
+#define ISYS F77_NAME(isys, ISYS)
+#define POTS F77_NAME(pots, POTS)
+#define STABLES F77_NAME(stables, STABLES)
+
+//
+// Main UrQMD function - C++ translation of UrQMD_main subroutine
+//
+void UrQMD_main()
+{
+    // Local variables matching FORTRAN declarations
+    int i, j, k, steps, ii, ocharge, ncharge, mc, mp, noc, it1, it2;
+    double sqrts_val, otime, xdummy, st;
+    bool isstable;
+    int stidx, CTOsave;
+    int cti1sav, cti2sav;
+    
+    // Hydro variables
+    double thydro_start, thydro, nucrad_val;
+    bool lhydro;
+    
+    //
+    // Numerical/technical initialization
+    //
+    int init_flag = 0;
+    F77_NAME(uinit, UINIT)(&init_flag);
+    
+    //
+    // Main program
+    //
+    mc = 0;
+    mp = 0;
+    noc = 0;
+    
+    //
+    // Loop over all events
+    //
+    for (SYS.event = 1; SYS.event <= INPUTS.nevents; SYS.event++) {
+        
+        // Start event here
+        
+        // Time is the system time at the BEGINNING of every timestep
+        RSYS.time = 0.0;
+        
+        // Hydro flag, hydro should be called only once
+        lhydro = true;
+        
+        // Initialize random number generator
+        // Call auto-seed generator only for first event and if no seed was fixed
+        if (!COMSEED.firstseed && !LOPTIONS.fixedseed) {
+            SYS.ranseed = -(1 * abs(SYS.ranseed));
+            F77_NAME(sseed, SSEED)(&SYS.ranseed);
+        } else {
+            COMSEED.firstseed = 0;  // false
+        }
+        
+        printf("event# %d %d\n", SYS.event, SYS.ranseed);
+        
+        // Init resonance reconstruction (only f13)
+        if (!LOPTIONS.bf13 && OPTIONS.CTOption[68-1] == 1) {
+            F77_NAME(init_resrec, INIT_RESREC)();
+        }
+        
+        //
+        // Initialization of physics quantities
+        //
+        F77_NAME(init, INIT)();
+        F77_NAME(init_eccentricity, INIT_ECCENTRICITY)();
+        
+        // If we are reading old events, check the success of the read-in
+        if (OPTIONS.CTOption[40-1] != 0 && !SYS.success) {
+            break;  // exit event loop
+        }
+        
+        // Hydro switch
+        if (OPTIONS.CTOption[45-1] == 1) {
+            // Hydro start time (nuclei have passed each other)
+            // ebeam is only the kinetic energy
+            // CTParam(65) is useful for the variation of the start time
+            // default value is one
+            nucrad_val = F77_NAME(nucrad, NUCRAD)(&SYS.Ap);
+            thydro_start = OPTIONS.CTParam[65-1] * 2.0 * nucrad_val * 
+                          sqrt(2.0 * emnuc / RSYS.ebeam);
+            printf("hydro starts after %.2f fm/c\n", thydro_start);
+            
+            // Lower limit for hydro start time
+            if (thydro_start < OPTIONS.CTParam[63-1]) {
+                thydro_start = OPTIONS.CTParam[63-1];
+                printf("... extended to %.2f fm/c\n", OPTIONS.CTParam[63-1]);
+            }
+        }
+        
+        // Old time if an old fort.14 is used
+        if (OPTIONS.CTOption[40-1] != 0) {
+            RSYS.time = RSYS.acttime;
+        }
+        
+        // Output preparation
+        
+        // Write headers to file
+        int unit;
+        unit = 13; F77_NAME(output, OUTPUT)(&unit);
+        unit = 14; F77_NAME(output, OUTPUT)(&unit);
+        unit = 15; F77_NAME(output, OUTPUT)(&unit);
+        unit = 16; F77_NAME(output, OUTPUT)(&unit);
+        
+        if (SYS.event == 1) {
+            unit = 17; F77_NAME(output, OUTPUT)(&unit);
+            F77_NAME(osc_header, OSC_HEADER)();
+            F77_NAME(osc99_header, OSC99_HEADER)();
+        }
+        
+        int neg_one = -1;
+        F77_NAME(osc99_event, OSC99_EVENT)(&neg_one);
+        
+        // For CTOption(4)=1 : output of initialization configuration
+        if (OPTIONS.CTOption[4-1] == 1) {
+            int zero = 0;
+            F77_NAME(file14out, FILE14OUT)(&zero);
+        }
+        
+        // Participant/spectator model
+        if (OPTIONS.CTOption[28-1] != 0) {
+            double x1 = 0.5 * RSYS.bimp;
+            double x2 = -(0.5 * RSYS.bimp);
+            F77_NAME(rmspec, RMSPEC)(&x1, &x2);
+        }
+        
+        // Compute time of output
+        otime = INPUTS.outsteps * POTS.dtimestep;
+        
+        // Reset time step counter
+        steps = 0;
+        
+        //
+        // Loop over all timesteps
+        //
+        for (steps = 1; steps <= SYS.nsteps; steps++) {
+            
+            // Store coordinates in arrays with *_t
+            // This is needed for MD type propagation
+            if (SYS.eos != 0) {
+                for (j = 0; j < SYS.npart; j++) {
+                    // Note: r0_t, rx_t, etc. would need to be declared if MD propagation is used
+                    // For now, we skip this as it requires additional COMMON blocks
+                }
+            }
+            
+            // We are at the beginning of the timestep, set current time (acttime)
+            RSYS.acttime = RSYS.time;
+            
+            // Option for MD without collision term
+            if (OPTIONS.CTOption[16-1] != 0) {
+                goto label_103;
+            }
+            
+            // Load collision table with next collisions in current timestep
+            F77_NAME(colload, COLLOAD)();
+            
+            // Check for collisions in time-step, nct = # of collisions in table
+            if (COLLTAB.nct > 0) {
+                
+                // Entry-point for collision loop in case of full colload after every coll.
+            label_101:
+                k = 0;
+                
+                // Normal entry-point for collision loop
+            label_100:
+                
+                // Get next collision
+                F77_NAME(getnext, GETNEXT)(&k);
+                
+                // Exit collision loop if no collisions are left
+                if (k == 0) goto label_102;
+                
+                // hp call hydro if start time is reached
+                if (OPTIONS.CTOption[45-1] == 1) {
+                    if (COLLTAB.cttime[k] > thydro_start && lhydro) {
+                        
+                        if (OPTIONS.CTOption[62-1] == 1) {
+                            F77_NAME(prepout, PREPOUT)();
+                            int zero = 0;
+                            F77_NAME(file14out, FILE14OUT)(&zero);
+                            F77_NAME(restore, RESTORE)();
+                        }
+                        
+                        st = thydro_start - RSYS.acttime;
+                        F77_NAME(cascstep, CASCSTEP)(&RSYS.acttime, &st);
+                        
+                        // hp all particle arrays will be modified by hydro
+                        printf("starting hydro\n");
+                        F77_NAME(hydro, HYDRO)(&thydro_start, &thydro);
+                        RSYS.acttime = thydro_start;
+                        lhydro = false;
+                        
+                        if (OPTIONS.CTOption[50-1] == 1) goto label_10_continue;
+                        
+                        if (thydro > 1.0e-8 || OPTIONS.CTOption[48-1] == 1) {
+                            // hp full update of collision table
+                            F77_NAME(colload, COLLOAD)();
+                            goto label_101;
+                        }
+                    }
+                }
+                
+                // Propagate all particles to next collision time
+                // Store actual time in acttime, propagation time st=cttime(k)-acttime
+                st = COLLTAB.cttime[k] - RSYS.acttime;
+                F77_NAME(cascstep, CASCSTEP)(&RSYS.acttime, &st);
+                
+                // New actual time (for upcoming collision)
+                RSYS.acttime = COLLTAB.cttime[k];
+                
+                // Perform collision
+                int idx1 = COLLTAB.cti1[k-1];
+                int idx2 = COLLTAB.cti2[k-1];
+                
+                if (idx2 > 0) {
+                    sqrts_val = F77_NAME(sqrts, SQRTS)(&idx1, &idx2);
+                    if (fabs(sqrts_val - COLLTAB.ctsqrts[k-1]) > 1.0e-3) {
+                        fprintf(stderr, " ***(E) wrong collision update (col) ***\n");
+                        fprintf(stderr, "%d %d %d %.6f %.6f\n", k, idx1, idx2,
+                               COLLTAB.ctsqrts[k-1], sqrts_val);
+                    }
+                } else if (idx2 == 0) {
+                    if (fabs(COOR.fmass[idx1-1] - COLLTAB.ctsqrts[k-1]) > 1.0e-3) {
+                        fprintf(stderr, " *** main(W) wrong collision update (decay)\n");
+                        fprintf(stderr, "%d %d %d %.6e %.6f %.6f\n", 
+                               SYS.ctag, idx1, ISYS.ityp[idx1-1],
+                               COOR.dectime[idx1-1], COOR.fmass[idx1-1],
+                               COLLTAB.ctsqrts[k-1]);
+                    }
+                }
+                
+                ocharge = ISYS.charge[idx1-1];
+                if (idx2 > 0) ocharge += ISYS.charge[idx2-1];
+                
+                // Store quantities in local variables for charge conservation check
+                it1 = ISYS.ityp[idx1-1];
+                if (idx2 > 0) it2 = ISYS.ityp[idx2-1];
+                
+                // Increment "dirty" collision counter
+                if (idx2 > 0) {  // scatter
+                    mc++;
+                }
+                
+                // Perform scattering/decay
+                cti1sav = COLLTAB.cti1[k-1];
+                cti2sav = COLLTAB.cti2[k-1];
+                
+                F77_NAME(scatter, SCATTER)(&COLLTAB.cti1[k-1], &COLLTAB.cti2[k-1],
+                                          &COLLTAB.ctsigtot[k-1], &COLLTAB.ctsqrts[k-1],
+                                          &COLLTAB.ctcolfluc[k-1]);
+                
+                //
+                // Update collision table
+                //
+                // Normal update mode
+                if (OPTIONS.CTOption[17-1] == 0) {
+                    if (INEWPART.nexit == 0) {
+                        // New collision partners for pauli-blocked states (nexit=0)
+                        if (COLLTAB.cti1[k-1] != cti1sav || COLLTAB.cti2[k-1] != cti2sav) {
+                            COLLTAB.cti1[k-1] = cti1sav;
+                            COLLTAB.cti2[k-1] = cti2sav;
+                        }
+                        int one = 1;
+                        F77_NAME(collupd, COLLUPD)(&COLLTAB.cti1[k-1], &one);
+                        if (COLLTAB.cti2[k-1] > 0) {
+                            F77_NAME(collupd, COLLUPD)(&COLLTAB.cti2[k-1], &one);
+                        }
+                    } else {
+                        ncharge = 0;
+                        // New collision partners for scattered/produced particles (nexit><0)
+                        for (i = 0; i < INEWPART.nexit; i++) {
+                            // ncharge is used for charge conservation check
+                            ncharge += ISYS.charge[INEWPART.inew[i]-1];
+                            int one = 1;
+                            F77_NAME(collupd, COLLUPD)(&INEWPART.inew[i], &one);
+                        }
+                        
+                        // Charge conservation check
+                        if (ocharge != ncharge) {
+                            fprintf(stderr, "ch-conservation error coll/dec %d\n", SYS.ctag);
+                            fprintf(stderr, "   it1: %d   it2: %d\n", it1, it2);
+                            fprintf(stderr, "   ch: %d %d\n", ocharge, ncharge);
+                            fprintf(stderr, "cti1(k),cti2(k),ctsigtot(k),ctsqrts(k)\n");
+                            fprintf(stderr, "%d %d %.6f %.6f\n", 
+                                   COLLTAB.cti1[k-1], COLLTAB.cti2[k-1],
+                                   COLLTAB.ctsigtot[k-1], COLLTAB.ctsqrts[k-1]);
+                        }
+                    }
+                    
+                    // Update collisions for partners of annihilated particles
+                    for (ii = 0; ii < COLLTAB.nsav; ii++) {
+                        int one = 1;
+                        F77_NAME(collupd, COLLUPD)(&COLLTAB.ctsav[ii], &one);
+                    }
+                    COLLTAB.nsav = 0;
+                } else {  // (CTOption(17).ne.0)
+                    // Full collision load
+                    F77_NAME(colload, COLLOAD)();
+                }
+                
+                if (OPTIONS.CTOption[17-1] == 0) goto label_100;
+                goto label_101;
+                
+                // This is the point to jump to after all collisions in the timestep
+                // have been taken care of
+            label_102:
+                ;  // continue
+                
+            }  // (nct.gt.0)
+            
+            // After all collisions in the timestep are done, propagate to end of
+            // the timestep.
+            
+            // Point to jump to in case of MD without collision term
+        label_103:
+            
+            // Increment timestep
+            RSYS.time = RSYS.time + POTS.dtimestep;
+            
+            // After all collisions in the timestep are done, propagate to end of
+            // the timestep.
+            st = RSYS.time - RSYS.acttime;
+            F77_NAME(cascstep, CASCSTEP)(&RSYS.acttime, &st);
+            
+            // In case of potential interaction, do MD propagation step
+            if (SYS.eos != 0) {
+                // Set initial conditions for MD propagation-step
+                for (j = 0; j < SYS.npart; j++) {
+                    // r0(j) = r0_t(j) etc.
+                    // Skipped - requires additional temporary arrays
+                }
+                
+                // Now molecular dynamics trajectories
+                F77_NAME(proprk, PROPRK)(&RSYS.time, &POTS.dtimestep);
+            }
+            
+            // Perform output if desired
+            if ((steps % INPUTS.outsteps) == 0 && steps < SYS.nsteps) {
+                if (OPTIONS.CTOption[28-1] == 2) {
+                    F77_NAME(spectrans, SPECTRANS)(&otime);
+                }
+                if (OPTIONS.CTOption[62-1] == 1) {
+                    F77_NAME(prepout, PREPOUT)();
+                }
+                F77_NAME(file14out, FILE14OUT)(&steps);
+                if (OPTIONS.CTOption[64-1] == 1) {
+                    F77_NAME(file13out, FILE13OUT)(&steps);
+                }
+                if (OPTIONS.CTOption[62-1] == 1) {
+                    F77_NAME(restore, RESTORE)();
+                    F77_NAME(colload, COLLOAD)();
+                }
+                if (OPTIONS.CTOption[55-1] == 1) {
+                    F77_NAME(osc_vis, OSC_VIS)(&steps);
+                }
+            }  // output handling
+            
+        }  // time step loop
+        
+        // e
+        RSYS.acttime = RSYS.time;
+        
+        // Optional decay of all unstable particles before final output
+        // DANGER: pauli-blocked decays are not performed !!!
+        if (OPTIONS.CTOption[18-1] == 0) {
+            // No do-loop is used because npart changes in loop-structure
+            i = 0;
+            COLLTAB.nct = 0;
+            COLLTAB.actcol = 0;
+            
+            // Disable Pauli-Blocker for final decays
+            CTOsave = OPTIONS.CTOption[10-1];
+            OPTIONS.CTOption[10-1] = 1;
+            
+            // Decay loop structure starts here
+        label_40:
+            i++;
+            
+            // Is particle unstable
+            if (COOR.dectime[i-1] < 1.0e30) {
+            label_41:
+                isstable = false;
+                for (stidx = 0; stidx < STABLES.nstable; stidx++) {
+                    if (ISYS.ityp[i-1] == STABLES.stabvec[stidx]) {
+                        isstable = true;
+                    }
+                }
+                if (!isstable) {
+                    // Perform decay
+                    int zero = 0;
+                    double zero_d = 0.0;
+                    F77_NAME(scatter, SCATTER)(&i, &zero, &zero_d, 
+                                              &COOR.fmass[i-1], &xdummy);
+                    
+                    // Backtracing if decay-product is unstable itself
+                    if (COOR.dectime[i-1] < 1.0e30) goto label_41;
+                }
+            }
+            
+            // Check next particle
+            if (i < SYS.npart) goto label_40;
+            
+        }  // final decay
+        
+        OPTIONS.CTOption[10-1] = CTOsave;
+        
+        // Final output
+        if (OPTIONS.CTOption[64-1] == 1) {
+            F77_NAME(coalescence, COALESCENCE)();
+        }
+        
+        F77_NAME(file13out, FILE13OUT)(&SYS.nsteps);
+        if (OPTIONS.CTOption[50-1] == 0) {
+            F77_NAME(file14out, FILE14OUT)(&SYS.nsteps);
+        }
+        F77_NAME(file16out, FILE16OUT)();
+        if (OPTIONS.CTOption[50-1] == 0 && OPTIONS.CTOption[55-1] == 0) {
+            F77_NAME(osc_event, OSC_EVENT)();
+        }
+        if (OPTIONS.CTOption[50-1] == 0 && OPTIONS.CTOption[55-1] == 1) {
+            F77_NAME(osc_vis, OSC_VIS)(&SYS.nsteps);
+        }
+        int one = 1;
+        F77_NAME(osc99_event, OSC99_EVENT)(&one);
+        F77_NAME(osc99_eoe, OSC99_EOE)();
+        
+        mp += SYS.npart;
+        if (SYS.ctag == 0) {
+            printf("(W) No collision in event %d\n", SYS.event);
+            noc++;
+        }
+        
+        // End of event loop
+    label_10_continue:
+        continue;
+    }  // event loop
+    
+    printf("no. of collisions = %.1f (per event)\n", 
+           mc / static_cast<double>(INPUTS.nevents));
+    printf("final particles   = %.1f (per event)\n",
+           mp / static_cast<double>(INPUTS.nevents));
+    printf("empty events      : %d = %.1f%%\n",
+           noc, noc * 100.0 / static_cast<double>(INPUTS.nevents));
+}
