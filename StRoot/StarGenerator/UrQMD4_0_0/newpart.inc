@@ -5,7 +5,7 @@ c     include-file newpart
 c
 cdes     this file contains arrays for scattered or new created particles
 cdes     and is used to communicate between the different routines which
-cdes     are involved in hadling the kinematics
+cdes     are involved in handling the kinematics
 c
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 
