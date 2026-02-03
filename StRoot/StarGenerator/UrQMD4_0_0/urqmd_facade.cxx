@@ -317,10 +317,13 @@ void UrQMD_main()
             
             // Store coordinates in arrays with *_t
             // This is needed for MD type propagation
+            // NOTE: MD propagation requires r0_t, rx_t, ry_t, rz_t temporary arrays
+            // which are in the /mdprop/ COMMON block (see coms.inc)
+            // This functionality is preserved but not implemented in this minimal facade
             if (SYS.eos != 0) {
                 for (j = 0; j < SYS.npart; j++) {
-                    // Note: r0_t, rx_t, etc. would need to be declared if MD propagation is used
-                    // For now, we skip this as it requires additional COMMON blocks
+                    // TODO: Implement MD coordinate storage when needed
+                    // r0_t(j) = r0(j); rx_t(j) = rx(j); etc.
                 }
             }
             
@@ -506,9 +509,11 @@ void UrQMD_main()
             // In case of potential interaction, do MD propagation step
             if (SYS.eos != 0) {
                 // Set initial conditions for MD propagation-step
+                // NOTE: This requires the /mdprop/ COMMON block with temporary arrays
+                // r0_t, rx_t, ry_t, rz_t (see coms.inc line 96-98)
                 for (j = 0; j < SYS.npart; j++) {
-                    // r0(j) = r0_t(j) etc.
-                    // Skipped - requires additional temporary arrays
+                    // TODO: Implement MD coordinate restoration when needed
+                    // r0(j) = r0_t(j); rx(j) = rx_t(j); etc.
                 }
                 
                 // Now molecular dynamics trajectories
