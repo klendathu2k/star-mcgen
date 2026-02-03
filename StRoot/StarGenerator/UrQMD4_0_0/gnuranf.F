@@ -29,7 +29,7 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       subroutine sseed(ranseed)
 c
-c     reset the random number generato
+c     reset the random number generator
 c
 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 
