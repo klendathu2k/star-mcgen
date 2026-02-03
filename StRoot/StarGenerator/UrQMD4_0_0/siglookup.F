@@ -36,7 +36,7 @@ c
 c exp(tblstp) is Delta(sqrts) for table
       tblstp=sigmascal(iline,3)
 c
-c maximum log of sqrt(s) enty in the table
+c maximum log of sqrt(s) entry in the table
       thigh=itblsz*tblstp+tlow
 c
 c table-lookup sequence (modified IQMD/RQMD)
