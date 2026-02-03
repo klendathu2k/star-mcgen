@@ -210,6 +210,11 @@ void UrQMD_main()
         
         // Start event here
         
+        // Declare variables that might be used with goto statements
+        int one_val = 1;
+        int zero_val = 0;
+        int neg_one_val = -1;
+        
         // Time is the system time at the BEGINNING of every timestep
         RSYS.time = 0.0;
         
@@ -281,13 +286,11 @@ void UrQMD_main()
             F77_NAME(osc99_header, OSC99_HEADER)();
         }
         
-        int neg_one = -1;
-        F77_NAME(osc99_event, OSC99_EVENT)(&neg_one);
+        F77_NAME(osc99_event, OSC99_EVENT)(&neg_one_val);
         
         // For CTOption(4)=1 : output of initialization configuration
         if (OPTIONS.CTOption[4-1] == 1) {
-            int zero = 0;
-            F77_NAME(file14out, FILE14OUT)(&zero);
+            F77_NAME(file14out, FILE14OUT)(&zero_val);
         }
         
         // Participant/spectator model
@@ -307,6 +310,10 @@ void UrQMD_main()
         // Loop over all timesteps
         //
         for (steps = 1; steps <= SYS.nsteps; steps++) {
+            
+            // Declare all variables that might be used with goto statements
+            int idx1, idx2;
+            double sqrts_val_local;
             
             // Store coordinates in arrays with *_t
             // This is needed for MD type propagation
@@ -383,15 +390,15 @@ void UrQMD_main()
                 RSYS.acttime = COLLTAB.cttime[k];
                 
                 // Perform collision
-                int idx1 = COLLTAB.cti1[k-1];
-                int idx2 = COLLTAB.cti2[k-1];
+                idx1 = COLLTAB.cti1[k-1];
+                idx2 = COLLTAB.cti2[k-1];
                 
                 if (idx2 > 0) {
-                    sqrts_val = F77_NAME(sqrts, SQRTS)(&idx1, &idx2);
-                    if (fabs(sqrts_val - COLLTAB.ctsqrts[k-1]) > 1.0e-3) {
+                    sqrts_val_local = F77_NAME(sqrts, SQRTS)(&idx1, &idx2);
+                    if (fabs(sqrts_val_local - COLLTAB.ctsqrts[k-1]) > 1.0e-3) {
                         fprintf(stderr, " ***(E) wrong collision update (col) ***\n");
                         fprintf(stderr, "%d %d %d %.6f %.6f\n", k, idx1, idx2,
-                               COLLTAB.ctsqrts[k-1], sqrts_val);
+                               COLLTAB.ctsqrts[k-1], sqrts_val_local);
                     }
                 } else if (idx2 == 0) {
                     if (fabs(COOR.fmass[idx1-1] - COLLTAB.ctsqrts[k-1]) > 1.0e-3) {
@@ -594,8 +601,7 @@ void UrQMD_main()
         if (OPTIONS.CTOption[50-1] == 0 && OPTIONS.CTOption[55-1] == 1) {
             F77_NAME(osc_vis, OSC_VIS)(&SYS.nsteps);
         }
-        int one = 1;
-        F77_NAME(osc99_event, OSC99_EVENT)(&one);
+        F77_NAME(osc99_event, OSC99_EVENT)(&one_val);
         F77_NAME(osc99_eoe, OSC99_EOE)();
         
         mp += SYS.npart;
