@@ -1,6 +1,7 @@
 #ifndef __urqmd_facade_h__
 #define __urqmd_facade_h__
 
+#include "StarCallf77.h"
 #include <cstdio>
 #include <cmath>
 
@@ -8,20 +9,6 @@
 // C++ facade for UrQMD FORTRAN subroutine UrQMD_main
 // This provides a procedural C++ interface to the FORTRAN UrQMD event generator
 //
-
-// FORTRAN name mangling macro (if not provided by build system)
-#ifndef F77_NAME
-#if defined(__linux__) || defined(__unix__)
-  // Most Unix/Linux systems use lowercase with underscore
-  #define F77_NAME(name,NAME) name##_
-#elif defined(__APPLE__)
-  // macOS also uses lowercase with underscore
-  #define F77_NAME(name,NAME) name##_
-#else
-  // Fallback: lowercase with underscore (most common)
-  #define F77_NAME(name,NAME) name##_
-#endif
-#endif
 
 // Forward declarations for FORTRAN subroutines that will be called
 extern "C" {
