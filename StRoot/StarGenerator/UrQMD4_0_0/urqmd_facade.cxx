@@ -7,6 +7,22 @@
 // Translates the main event loop logic from FORTRAN to C++ using procedural style
 //
 
+// Define FORTRAN COMMON block name mappings
+#define energies F77_NAME(energies, ENERGIES)
+#define sys F77_NAME(sys, SYS)
+#define rsys F77_NAME(rsys, RSYS)
+#define inputs F77_NAME(inputs, INPUTS)
+#define input2 F77_NAME(input2, INPUT2)
+#define options F77_NAME(options, OPTIONS)
+#define loptions F77_NAME(loptions, LOPTIONS)
+#define stables F77_NAME(stables, STABLES)
+#define comseed F77_NAME(comseed, COMSEED)
+#define colltab F77_NAME(colltab, COLLTAB)
+#define inewpart F77_NAME(inewpart, INEWPART)
+#define coor F77_NAME(coor, COOR)
+#define isys F77_NAME(isys, ISYS)
+#define pots F77_NAME(pots, POTS)
+
 // COMMON block declarations (matching FORTRAN layout)
 // These allow direct access to FORTRAN COMMON blocks from C++
 
@@ -14,7 +30,7 @@
 extern "C" {
     struct {
         double Ekinbar, Ekinmes, ESky2, ESky3, EYuk, ECb, EPau;
-    } F77_NAME(energies, ENERGIES);
+    } energies;
 }
 
 // /sys/ common block
@@ -25,14 +41,14 @@ extern "C" {
         int NHardRes, NSoftRes, NDecRes, NElColl, NBlColl;
         int success;  // logical -> int mapping
         int npartcoal, nclus;
-    } F77_NAME(sys, SYS);
+    } sys;
 }
 
 // /rsys/ common block
 extern "C" {
     struct {
         double time, acttime, bdist, bimp, bmin, ebeam, ecm;
-    } F77_NAME(rsys, RSYS);
+    } rsys;
 }
 
 // /inputs/ common block
@@ -41,7 +57,7 @@ extern "C" {
         int nevents, spityp[2], prspflg, trspflg;
         int spiso3[2], outsteps, bflag, srtflag, efuncflag, nsrt;
         int firstev, npb;
-    } F77_NAME(inputs, INPUTS);
+    } inputs;
 }
 
 // /input2/ common block
@@ -49,7 +65,7 @@ extern "C" {
     struct {
         double srtmin, srtmax, pbeam, betann, betatar, betapro;
         double pbmin, pbmax;
-    } F77_NAME(input2, INPUT2);
+    } input2;
 }
 
 // /options/ common block
@@ -57,14 +73,14 @@ extern "C" {
     struct {
         int CTOption[400];
         double CTParam[400];
-    } F77_NAME(options, OPTIONS);
+    } options;
 }
 
 // /loptions/ common block
 extern "C" {
     struct {
         int fixedseed, bf13, bf14, bf15, bf16, bf19, bf20;  // logical -> int
-    } F77_NAME(loptions, LOPTIONS);
+    } loptions;
 }
 
 // /stables/ common block
@@ -72,14 +88,14 @@ extern "C" {
     struct {
         int nstable;
         int stabvec[20];
-    } F77_NAME(stables, STABLES);
+    } stables;
 }
 
 // /comseed/ common block
 extern "C" {
     struct {
         int firstseed;  // logical -> int
-    } F77_NAME(comseed, COMSEED);
+    } comseed;
 }
 
 // /colltab/ common block
@@ -98,7 +114,7 @@ extern "C" {
         int nsav;
         int apt;
         double ctcolfluc[100000];
-    } F77_NAME(colltab, COLLTAB);
+    } colltab;
 }
 
 // /inewpart/ common block
@@ -114,7 +130,7 @@ extern "C" {
         int nstring1, nstring2;
         int itypold[2];
         int iso3old[2];
-    } F77_NAME(inewpart, INEWPART);
+    } inewpart;
 }
 
 // /coor/ common block (particle coordinates)
@@ -131,7 +147,7 @@ extern "C" {
         double fmass[100000];
         double rww[100000];
         double dectime[100000];
-    } F77_NAME(coor, COOR);
+    } coor;
 }
 
 // /isys/ common block (particle properties)
@@ -145,7 +161,7 @@ extern "C" {
         int iso3[100000];
         int origin[100000];
         int uid[100000];
-    } F77_NAME(isys, ISYS);
+    } isys;
 }
 
 // /pots/ common block
@@ -154,25 +170,25 @@ extern "C" {
         double Cb0, Yuk0, Pau0, Sky20, Sky30, gamSky;
         double gamYuk, drPau, dpPau, gw, sgw, delr, fdel;
         double dt, da, db, dtimestep;
-    } F77_NAME(pots, POTS);
+    } pots;
 }
 
 // Parameters
 const double emnuc = 0.938;  // nucleon mass
 
-// Macro to access COMMON blocks
-#define SYS F77_NAME(sys, SYS)
-#define RSYS F77_NAME(rsys, RSYS)
-#define INPUTS F77_NAME(inputs, INPUTS)
-#define OPTIONS F77_NAME(options, OPTIONS)
-#define LOPTIONS F77_NAME(loptions, LOPTIONS)
-#define COMSEED F77_NAME(comseed, COMSEED)
-#define COLLTAB F77_NAME(colltab, COLLTAB)
-#define INEWPART F77_NAME(inewpart, INEWPART)
-#define COOR F77_NAME(coor, COOR)
-#define ISYS F77_NAME(isys, ISYS)
-#define POTS F77_NAME(pots, POTS)
-#define STABLES F77_NAME(stables, STABLES)
+// Macro to access COMMON blocks (using the defined names)
+#define SYS sys
+#define RSYS rsys
+#define INPUTS inputs
+#define OPTIONS options
+#define LOPTIONS loptions
+#define COMSEED comseed
+#define COLLTAB colltab
+#define INEWPART inewpart
+#define COOR coor
+#define ISYS isys
+#define POTS pots
+#define STABLES stables
 
 //
 // Main UrQMD function - C++ translation of UrQMD_main subroutine
@@ -194,7 +210,7 @@ void UrQMD_main()
     // Numerical/technical initialization
     //
     int init_flag = 0;
-    F77_NAME(uinit, UINIT)(&init_flag);
+    uinit(&init_flag);
     
     //
     // Main program
@@ -225,7 +241,7 @@ void UrQMD_main()
         // Call auto-seed generator only for first event and if no seed was fixed
         if (!COMSEED.firstseed && !LOPTIONS.fixedseed) {
             SYS.ranseed = -(1 * abs(SYS.ranseed));
-            F77_NAME(sseed, SSEED)(&SYS.ranseed);
+            sseed(&SYS.ranseed);
         } else {
             COMSEED.firstseed = 0;  // false
         }
@@ -234,14 +250,14 @@ void UrQMD_main()
         
         // Init resonance reconstruction (only f13)
         if (!LOPTIONS.bf13 && OPTIONS.CTOption[68-1] == 1) {
-            F77_NAME(init_resrec, INIT_RESREC)();
+            init_resrec();
         }
         
         //
         // Initialization of physics quantities
         //
-        F77_NAME(init, INIT)();
-        F77_NAME(init_eccentricity, INIT_ECCENTRICITY)();
+        init();
+        init_eccentricity();
         
         // If we are reading old events, check the success of the read-in
         if (OPTIONS.CTOption[40-1] != 0 && !SYS.success) {
@@ -254,7 +270,7 @@ void UrQMD_main()
             // ebeam is only the kinetic energy
             // CTParam(65) is useful for the variation of the start time
             // default value is one
-            nucrad_val = F77_NAME(nucrad, NUCRAD)(&SYS.Ap);
+            nucrad_val = nucrad(&SYS.Ap);
             thydro_start = OPTIONS.CTParam[65-1] * 2.0 * nucrad_val * 
                           sqrt(2.0 * emnuc / RSYS.ebeam);
             printf("hydro starts after %.2f fm/c\n", thydro_start);
@@ -275,29 +291,29 @@ void UrQMD_main()
         
         // Write headers to file
         int unit;
-        unit = 13; F77_NAME(output, OUTPUT)(&unit);
-        unit = 14; F77_NAME(output, OUTPUT)(&unit);
-        unit = 15; F77_NAME(output, OUTPUT)(&unit);
-        unit = 16; F77_NAME(output, OUTPUT)(&unit);
+        unit = 13; output(&unit);
+        unit = 14; output(&unit);
+        unit = 15; output(&unit);
+        unit = 16; output(&unit);
         
         if (SYS.event == 1) {
-            unit = 17; F77_NAME(output, OUTPUT)(&unit);
-            F77_NAME(osc_header, OSC_HEADER)();
-            F77_NAME(osc99_header, OSC99_HEADER)();
+            unit = 17; output(&unit);
+            osc_header();
+            osc99_header();
         }
         
-        F77_NAME(osc99_event, OSC99_EVENT)(&neg_one_val);
+        osc99_event(&neg_one_val);
         
         // For CTOption(4)=1 : output of initialization configuration
         if (OPTIONS.CTOption[4-1] == 1) {
-            F77_NAME(file14out, FILE14OUT)(&zero_val);
+            file14out(&zero_val);
         }
         
         // Participant/spectator model
         if (OPTIONS.CTOption[28-1] != 0) {
             double x1 = 0.5 * RSYS.bimp;
             double x2 = -(0.5 * RSYS.bimp);
-            F77_NAME(rmspec, RMSPEC)(&x1, &x2);
+            rmspec(&x1, &x2);
         }
         
         // Compute time of output
@@ -336,7 +352,7 @@ void UrQMD_main()
             }
             
             // Load collision table with next collisions in current timestep
-            F77_NAME(colload, COLLOAD)();
+            colload();
             
             // Check for collisions in time-step, nct = # of collisions in table
             if (COLLTAB.nct > 0) {
@@ -349,7 +365,7 @@ void UrQMD_main()
             label_100:
                 
                 // Get next collision
-                F77_NAME(getnext, GETNEXT)(&k);
+                getnext(&k);
                 
                 // Exit collision loop if no collisions are left
                 if (k == 0) goto label_102;
@@ -359,18 +375,18 @@ void UrQMD_main()
                     if (COLLTAB.cttime[k] > thydro_start && lhydro) {
                         
                         if (OPTIONS.CTOption[62-1] == 1) {
-                            F77_NAME(prepout, PREPOUT)();
+                            prepout();
                             int zero = 0;
-                            F77_NAME(file14out, FILE14OUT)(&zero);
-                            F77_NAME(restore, RESTORE)();
+                            file14out(&zero);
+                            restore();
                         }
                         
                         st = thydro_start - RSYS.acttime;
-                        F77_NAME(cascstep, CASCSTEP)(&RSYS.acttime, &st);
+                        cascstep(&RSYS.acttime, &st);
                         
                         // hp all particle arrays will be modified by hydro
                         printf("starting hydro\n");
-                        F77_NAME(hydro, HYDRO)(&thydro_start, &thydro);
+                        hydro(&thydro_start, &thydro);
                         RSYS.acttime = thydro_start;
                         lhydro = false;
                         
@@ -378,7 +394,7 @@ void UrQMD_main()
                         
                         if (thydro > 1.0e-8 || OPTIONS.CTOption[48-1] == 1) {
                             // hp full update of collision table
-                            F77_NAME(colload, COLLOAD)();
+                            colload();
                             goto label_101;
                         }
                     }
@@ -387,7 +403,7 @@ void UrQMD_main()
                 // Propagate all particles to next collision time
                 // Store actual time in acttime, propagation time st=cttime(k)-acttime
                 st = COLLTAB.cttime[k] - RSYS.acttime;
-                F77_NAME(cascstep, CASCSTEP)(&RSYS.acttime, &st);
+                cascstep(&RSYS.acttime, &st);
                 
                 // New actual time (for upcoming collision)
                 RSYS.acttime = COLLTAB.cttime[k];
@@ -397,7 +413,7 @@ void UrQMD_main()
                 idx2 = COLLTAB.cti2[k-1];
                 
                 if (idx2 > 0) {
-                    sqrts_val_local = F77_NAME(sqrts, SQRTS)(&idx1, &idx2);
+                    sqrts_val_local = sqrts(&idx1, &idx2);
                     if (fabs(sqrts_val_local - COLLTAB.ctsqrts[k-1]) > 1.0e-3) {
                         fprintf(stderr, " ***(E) wrong collision update (col) ***\n");
                         fprintf(stderr, "%d %d %d %.6f %.6f\n", k, idx1, idx2,
@@ -429,7 +445,7 @@ void UrQMD_main()
                 cti1sav = COLLTAB.cti1[k-1];
                 cti2sav = COLLTAB.cti2[k-1];
                 
-                F77_NAME(scatter, SCATTER)(&COLLTAB.cti1[k-1], &COLLTAB.cti2[k-1],
+                scatter(&COLLTAB.cti1[k-1], &COLLTAB.cti2[k-1],
                                           &COLLTAB.ctsigtot[k-1], &COLLTAB.ctsqrts[k-1],
                                           &COLLTAB.ctcolfluc[k-1]);
                 
@@ -445,9 +461,9 @@ void UrQMD_main()
                             COLLTAB.cti2[k-1] = cti2sav;
                         }
                         int one = 1;
-                        F77_NAME(collupd, COLLUPD)(&COLLTAB.cti1[k-1], &one);
+                        collupd(&COLLTAB.cti1[k-1], &one);
                         if (COLLTAB.cti2[k-1] > 0) {
-                            F77_NAME(collupd, COLLUPD)(&COLLTAB.cti2[k-1], &one);
+                            collupd(&COLLTAB.cti2[k-1], &one);
                         }
                     } else {
                         ncharge = 0;
@@ -456,7 +472,7 @@ void UrQMD_main()
                             // ncharge is used for charge conservation check
                             ncharge += ISYS.charge[INEWPART.inew[i]-1];
                             int one = 1;
-                            F77_NAME(collupd, COLLUPD)(&INEWPART.inew[i], &one);
+                            collupd(&INEWPART.inew[i], &one);
                         }
                         
                         // Charge conservation check
@@ -474,12 +490,12 @@ void UrQMD_main()
                     // Update collisions for partners of annihilated particles
                     for (ii = 0; ii < COLLTAB.nsav; ii++) {
                         int one = 1;
-                        F77_NAME(collupd, COLLUPD)(&COLLTAB.ctsav[ii], &one);
+                        collupd(&COLLTAB.ctsav[ii], &one);
                     }
                     COLLTAB.nsav = 0;
                 } else {  // (CTOption(17).ne.0)
                     // Full collision load
-                    F77_NAME(colload, COLLOAD)();
+                    colload();
                 }
                 
                 if (OPTIONS.CTOption[17-1] == 0) goto label_100;
@@ -504,7 +520,7 @@ void UrQMD_main()
             // After all collisions in the timestep are done, propagate to end of
             // the timestep.
             st = RSYS.time - RSYS.acttime;
-            F77_NAME(cascstep, CASCSTEP)(&RSYS.acttime, &st);
+            cascstep(&RSYS.acttime, &st);
             
             // In case of potential interaction, do MD propagation step
             if (SYS.eos != 0) {
@@ -517,27 +533,27 @@ void UrQMD_main()
                 }
                 
                 // Now molecular dynamics trajectories
-                F77_NAME(proprk, PROPRK)(&RSYS.time, &POTS.dtimestep);
+                proprk(&RSYS.time, &POTS.dtimestep);
             }
             
             // Perform output if desired
             if ((steps % INPUTS.outsteps) == 0 && steps < SYS.nsteps) {
                 if (OPTIONS.CTOption[28-1] == 2) {
-                    F77_NAME(spectrans, SPECTRANS)(&otime);
+                    spectrans(&otime);
                 }
                 if (OPTIONS.CTOption[62-1] == 1) {
-                    F77_NAME(prepout, PREPOUT)();
+                    prepout();
                 }
-                F77_NAME(file14out, FILE14OUT)(&steps);
+                file14out(&steps);
                 if (OPTIONS.CTOption[64-1] == 1) {
-                    F77_NAME(file13out, FILE13OUT)(&steps);
+                    file13out(&steps);
                 }
                 if (OPTIONS.CTOption[62-1] == 1) {
-                    F77_NAME(restore, RESTORE)();
-                    F77_NAME(colload, COLLOAD)();
+                    restore();
+                    colload();
                 }
                 if (OPTIONS.CTOption[55-1] == 1) {
-                    F77_NAME(osc_vis, OSC_VIS)(&steps);
+                    osc_vis(&steps);
                 }
             }  // output handling
             
@@ -575,7 +591,7 @@ void UrQMD_main()
                     // Perform decay
                     int zero = 0;
                     double zero_d = 0.0;
-                    F77_NAME(scatter, SCATTER)(&i, &zero, &zero_d, 
+                    scatter(&i, &zero, &zero_d, 
                                               &COOR.fmass[i-1], &xdummy);
                     
                     // Backtracing if decay-product is unstable itself
@@ -592,22 +608,22 @@ void UrQMD_main()
         
         // Final output
         if (OPTIONS.CTOption[64-1] == 1) {
-            F77_NAME(coalescence, COALESCENCE)();
+            coalescence();
         }
         
-        F77_NAME(file13out, FILE13OUT)(&SYS.nsteps);
+        file13out(&SYS.nsteps);
         if (OPTIONS.CTOption[50-1] == 0) {
-            F77_NAME(file14out, FILE14OUT)(&SYS.nsteps);
+            file14out(&SYS.nsteps);
         }
-        F77_NAME(file16out, FILE16OUT)();
+        file16out();
         if (OPTIONS.CTOption[50-1] == 0 && OPTIONS.CTOption[55-1] == 0) {
-            F77_NAME(osc_event, OSC_EVENT)();
+            osc_event();
         }
         if (OPTIONS.CTOption[50-1] == 0 && OPTIONS.CTOption[55-1] == 1) {
-            F77_NAME(osc_vis, OSC_VIS)(&SYS.nsteps);
+            osc_vis(&SYS.nsteps);
         }
-        F77_NAME(osc99_event, OSC99_EVENT)(&one_val);
-        F77_NAME(osc99_eoe, OSC99_EOE)();
+        osc99_event(&one_val);
+        osc99_eoe();
         
         mp += SYS.npart;
         if (SYS.ctag == 0) {
